@@ -1,0 +1,8 @@
+{
+  "name": "damianonyx-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "check": "node --check dist/app.js" },
+  "devDependencies": { "vite": "8.0.13" }
+}
