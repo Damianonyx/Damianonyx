@@ -19,6 +19,11 @@
 @media(max-width:380px){.scrolled .brand-name{font-size:18px}.nav-inner{width:calc(100% - 28px)}.brand-name{font-size:21px}.header-controls{gap:13px}.hero{padding-inline:16px}.greeting{font-size:30px}.wrap{width:calc(100% - 34px)}.contact-grid{grid-template-columns:1fr}.archive-tabs{gap:8px}.archive-tabs button{font-size:11px}.project{padding:20px 14px}.section-title{font-size:41px}.about-copy .lead{font-size:23px}.philosophy{padding-inline:21px}}
 @media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}.js .entrance{display:none}.bar-fill{transform:scaleX(1)}.greeting.morph span{opacity:1;filter:none;transform:none}}
 
+/* Supplied contact icons stay compact beside each readable link label. */
+.contact-name{display:flex;align-items:center;gap:10px;min-height:32px}
+.contact-icon{display:block;flex:0 0 32px;width:32px;height:32px;object-fit:contain;background:#000;border:1px solid var(--line);border-radius:7px}
+.contact-link{gap:8px}
+
 /* Living topic card, recreated as readable text from the supplied reference. */
 .content-section{padding:0 0 24px}
 .content-card{--pointer-x:50%;--pointer-y:50%;position:relative;isolation:isolate;overflow:hidden;padding:42px 48px 48px;background:var(--soft);border:1px solid var(--line);border-radius:30px}
