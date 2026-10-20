@@ -48,8 +48,25 @@
 .content-play-icon,.content-motion[aria-pressed=true] .content-pause-icon{display:none}
 .content-motion[aria-pressed=true] .content-play-icon{display:block}
 @keyframes topic-float{0%,100%{transform:translate3d(0,1px,0) rotate(0)}25%{transform:translate3d(3px,-4px,0) rotate(.3deg)}60%{transform:translate3d(-2px,3px,0) rotate(-.25deg)}}
-@media(max-width:760px){.content-section{padding-bottom:64px}.content-card{padding:25px 24px 31px;border-radius:22px}.content-card-header{margin-bottom:20px}.content-category{font-size:18px;margin-bottom:28px}.content-topics{gap:20px 12px}.content-topic{font-size:18px;padding:11px 18px}.content-motion{width:44px;height:44px}.content-card:before{background-size:auto}}
-@media(max-width:380px){.content-card{padding-inline:19px}.content-topic{font-size:16px;padding:10px 16px}.content-topics{gap:18px 10px}}
+@keyframes topic-float-compact{0%,100%{transform:translateY(1px)}50%{transform:translateY(-1px)}}
+/* Three compact pairs keep the complete topic list visible on mobile. */
+@media(max-width:760px){
+  .content-section{padding-bottom:32px}
+  .content-card{padding:18px 16px 20px;border-radius:20px}
+  .content-card-header{gap:12px;margin-bottom:10px}
+  .content-card h2{font-size:22px}
+  .content-category{font-size:14px;margin-bottom:16px}
+  .content-topics{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px;max-width:500px}
+  .content-topic{grid-column:span 6;min-width:0;padding:8px 7px;font-size:clamp(11px,3.05vw,14px);line-height:1.35;white-space:nowrap;text-align:center;animation-name:topic-float-compact}
+  .content-topic:nth-child(1){grid-column:span 4}
+  .content-topic:nth-child(2){grid-column:span 8}
+  .content-topic:nth-child(3){grid-column:span 7}
+  .content-topic:nth-child(4){grid-column:span 5}
+  .content-motion{width:36px;height:36px}
+  .content-motion svg{width:16px;height:16px}
+  .content-card:before{background-size:auto}
+}
+@media(max-width:380px){.content-card{padding-inline:14px}.content-topic{padding-inline:5px}}
 @media(prefers-reduced-motion:reduce){.content-topic{animation:none!important}.content-card:before{display:none}.content-motion{display:none}}
 
 /* Supplied covers in the AI and research archive rows. */
