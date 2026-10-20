@@ -127,3 +127,38 @@ document.addEventListener('visibilitychange',()=>{pageVisible=!document.hidden;s
 let frame=0;
 function animate(now){frame++;if(pageVisible){if(layoutDirty)portraitLayout();if(!reduced||frame===1){drawPortrait(now);if(frame%2===0)drawGlobe(now);}}requestAnimationFrame(animate);}
 requestAnimationFrame(animate);
+// Keep the address available without displaying a second contact line.
+const copyEmailButton = $('#copy-email');
+const copyEmailStatus = $('#copy-email-status');
+let copyEmailReset;
+copyEmailButton.hidden = false;
+copyEmailButton.addEventListener('click', async () => {
+  const address = document.querySelector('.contact-email a').getAttribute('href').slice(7);
+  clearTimeout(copyEmailReset);
+  copyEmailStatus.textContent = '';
+  copyEmailButton.disabled = true;
+  try {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch {
+      const field = document.createElement('textarea');
+      field.value = address;
+      field.readOnly = true;
+      field.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.append(field);
+      try {
+        field.select();
+        if (!document.execCommand('copy')) throw new Error('Copy unavailable');
+      } finally {
+        field.remove();
+      }
+    }
+    copyEmailStatus.textContent = 'Email copied';
+  } catch {
+    copyEmailStatus.textContent = 'Unable to copy';
+  } finally {
+    copyEmailButton.disabled = false;
+    copyEmailButton.focus({ preventScroll: true });
+    copyEmailReset = setTimeout(() => { copyEmailStatus.textContent = ''; }, 3000);
+  }
+});
