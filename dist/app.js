@@ -91,57 +91,6 @@ const tabs=[...document.querySelectorAll('[role="tab"]')];
 function selectTab(tab,focus=false){tabs.forEach(t=>{const selected=t===tab;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!selected;});if(focus)tab.focus();}
 tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',e=>{let target;if(e.key==='ArrowRight')target=(i+1)%tabs.length;if(e.key==='ArrowLeft')target=(i+tabs.length-1)%tabs.length;if(e.key==='Home')target=0;if(e.key==='End')target=tabs.length-1;if(target!==undefined){e.preventDefault();selectTab(tabs[target],true)}})});
 
-// Audience figures stay selectable alongside the supplied globe video.
-const audienceVideo = $('#audience-video');
-const audienceMotion = $('#audience-motion');
-const countryButtons = [...document.querySelectorAll('.country')];
-let audienceVisible = false;
-let audiencePausedByUser = false;
-let audienceMotionOverride = false;
-function selectCountry(index) {
-  countryButtons.forEach((button, i) => {
-    button.classList.toggle('is-active', i === index);
-    button.setAttribute('aria-pressed', String(i === index));
-  });
-  $('#globe-country').textContent = countryButtons[index].querySelector('.country-name').textContent;
-  $('#globe-share').textContent = countryButtons[index].querySelector('.country-value').textContent;
-}
-countryButtons.forEach((button, index) => {
-  button.addEventListener('click', () => selectCountry(index));
-  button.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') selectCountry(index); });
-  button.addEventListener('focus', () => selectCountry(index));
-});
-selectCountry(0);
-function updateAudienceControl() {
-  const paused = audienceVideo.paused;
-  audienceMotion.setAttribute('aria-pressed', String(paused));
-  audienceMotion.setAttribute('aria-label', paused ? 'Play audience animation' : 'Pause audience animation');
-}
-function syncAudiencePlayback() {
-  if (!audienceVisible || document.hidden || audiencePausedByUser || (reducedQuery.matches && !audienceMotionOverride)) {
-    audienceVideo.pause();
-  } else {
-    audienceVideo.play().catch(updateAudienceControl);
-  }
-  updateAudienceControl();
-}
-audienceVideo.muted = true;
-audienceVideo.controls = false;
-audienceMotion.hidden = false;
-audienceMotion.addEventListener('click', () => {
-  audiencePausedByUser = !audienceVideo.paused;
-  audienceMotionOverride = !audiencePausedByUser;
-  syncAudiencePlayback();
-});
-for (const event of ['play', 'pause', 'loadeddata']) audienceVideo.addEventListener(event, updateAudienceControl);
-new IntersectionObserver(entries => {
-  audienceVisible = entries[0].isIntersecting;
-  if (audienceVisible) $('#audience').classList.add('in-view');
-  syncAudiencePlayback();
-}, { threshold: .1 }).observe($('.audience-visual'));
-document.addEventListener('visibilitychange', syncAudiencePlayback);
-reducedQuery.addEventListener('change', () => { audienceMotionOverride = false; syncAudiencePlayback(); });
-
 // The flower exists only in the closing dialog and starts on visitor activation.
 const bloomDialog=$('#bloom-dialog'),bloomTrigger=$('#bloom-trigger'),flower=$('#flower'),flowerStill=$('#flower-still');
 let oldOverflow='';
