@@ -7,7 +7,7 @@ let pageVisible=!document.hidden;
 const themeButton=$('#theme-toggle');
 function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#101012':'#ffffff';}
 updateThemeButton();
-themeButton.addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('geek-theme',root.dataset.theme)}catch{}updateThemeButton();drawPortrait(performance.now());drawGlobe(performance.now());});
+themeButton.addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('geek-theme',root.dataset.theme)}catch{}updateThemeButton();drawPortrait(performance.now());});
 const entrance=$('#entrance');
 let entered=false;
 function enter(){if(entered)return;entered=true;entrance.classList.add('is-gone');}
@@ -57,7 +57,7 @@ function drawPortrait(now){if(!portraitReady||!pageVisible)return;if(layoutDirty
 window.addEventListener('pointermove',e=>{pointer={x:e.clientX-position.x,y:e.clientY-position.y}},{passive:true});
 window.addEventListener('pointerout',()=>{pointer={x:-999,y:-999}},{passive:true});
 window.addEventListener('scroll',()=>{layoutDirty=true;if(reduced){portraitLayout();drawPortrait(performance.now())}},{passive:true});
-window.addEventListener('resize',()=>{layoutDirty=true;portraitLayout();drawPortrait(performance.now());resizeGlobe();drawGlobe(performance.now())},{passive:true});
+window.addEventListener('resize',()=>{layoutDirty=true;portraitLayout();drawPortrait(performance.now());},{passive:true});
 new ResizeObserver(()=>{layoutDirty=true}).observe(portraitAnchor);
 portraitLayout();
 
@@ -91,21 +91,56 @@ const tabs=[...document.querySelectorAll('[role="tab"]')];
 function selectTab(tab,focus=false){tabs.forEach(t=>{const selected=t===tab;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!selected;});if(focus)tab.focus();}
 tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',e=>{let target;if(e.key==='ArrowRight')target=(i+1)%tabs.length;if(e.key==='ArrowLeft')target=(i+tabs.length-1)%tabs.length;if(e.key==='Home')target=0;if(e.key==='End')target=tabs.length-1;if(target!==undefined){e.preventDefault();selectTab(tabs[target],true)}})});
 
-// Audience figures transcribed from the supplied three-month impressions snapshot.
-const countries=[{code:'US',name:'United States',share:41.1,lat:38,lon:-98},{code:'JP',name:'Japan',share:20.8,lat:36,lon:138},{code:'TR',name:'Turkey',share:9.1,lat:39,lon:35},{code:'FR',name:'France',share:4.6,lat:46,lon:2},{code:'NG',name:'Nigeria',share:4.4,lat:9,lon:8},{code:'DE',name:'Germany',share:2.4,lat:51,lon:10},{code:'GB',name:'United Kingdom',share:1.6,lat:54,lon:-2},{code:'SA',name:'Saudi Arabia',share:1.3,lat:24,lon:45}];
-const globe=$('#globe'),gctx=globe.getContext('2d');
-let globeW=0,globeH=0,globeVisible=false,selectedCountry=0,targetRotation=98*Math.PI/180,rotation=targetRotation,globePinned=false,lastGlobeChange=0;
-const countryButtons=[...document.querySelectorAll('.country')];
-function selectCountry(index,manual=false){selectedCountry=index;targetRotation=-countries[index].lon*Math.PI/180;while(targetRotation-rotation>Math.PI)targetRotation-=Math.PI*2;while(targetRotation-rotation<-Math.PI)targetRotation+=Math.PI*2;countryButtons.forEach((b,i)=>{b.classList.toggle('is-active',i===index);b.setAttribute('aria-pressed',String(i===index))});$('#globe-country').textContent=countries[index].name;$('#globe-share').textContent=countries[index].share+'%';if(manual)globePinned=true;lastGlobeChange=performance.now();if(reduced){rotation=targetRotation;drawGlobe(performance.now())}}
-countryButtons.forEach((b,i)=>{b.addEventListener('click',()=>selectCountry(i,true));b.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')selectCountry(i,true)});b.addEventListener('focus',()=>selectCountry(i,true));});
-function resizeGlobe(){globeW=globe.clientWidth;globeH=globe.clientHeight;const dpr=Math.min(devicePixelRatio||1,2);globe.width=Math.round(globeW*dpr);globe.height=Math.round(globeH*dpr);gctx.setTransform(dpr,0,0,dpr,0,0)}
-function project(lat,lon){const a=lat*Math.PI/180,b=lon*Math.PI/180+rotation;const x=Math.cos(a)*Math.sin(b),y=-Math.sin(a),z=Math.cos(a)*Math.cos(b);const tilt=.18;return{x,y:y*Math.cos(tilt)+z*Math.sin(tilt),z:z*Math.cos(tilt)-y*Math.sin(tilt)}}
-function drawGlobe(now){if(!globeVisible||!globeW||!pageVisible)return;if(!reduced)rotation+=(targetRotation-rotation)*.045;else rotation=targetRotation;const ctx=gctx,w=globeW,h=globeH,cx=w/2,cy=h/2,r=Math.min(w,h)*.405,dark=root.dataset.theme==='dark';const ink=dark?'238,238,242':'30,30,35';ctx.clearRect(0,0,w,h);ctx.lineWidth=.65;ctx.strokeStyle=`rgba(${ink},.12)`;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();for(let lat=-60;lat<=60;lat+=30){ctx.beginPath();let pen=false;for(let lon=-180;lon<=180;lon+=3){const p=project(lat,lon);if(p.z>-.02){if(!pen)ctx.moveTo(cx+p.x*r,cy+p.y*r);else ctx.lineTo(cx+p.x*r,cy+p.y*r);pen=true}else pen=false;}ctx.stroke();}for(let lon=-180;lon<180;lon+=30){ctx.beginPath();let pen=false;for(let lat=-90;lat<=90;lat+=3){const p=project(lat,lon);if(p.z>-.02){if(!pen)ctx.moveTo(cx+p.x*r,cy+p.y*r);else ctx.lineTo(cx+p.x*r,cy+p.y*r);pen=true}else pen=false;}ctx.stroke();}
-for(let lat=-75;lat<85;lat+=6){const step=6/Math.max(.25,Math.cos(lat*Math.PI/180));for(let lon=-180;lon<180;lon+=step){const p=project(lat,lon);if(p.z<0)continue;ctx.fillStyle=`rgba(${ink},${.13+p.z*.16})`;const s=1.1+p.z*.5;ctx.fillRect(cx+p.x*r-s/2,cy+p.y*r-s/2,s,s)}}
-for(let i=0;i<countries.length;i++){const c=countries[i],p=project(c.lat,c.lon);if(p.z<0)continue;const x=cx+p.x*r,y=cy+p.y*r,active=i===selectedCountry;ctx.fillStyle=`rgba(${ink},${active?1:.4})`;ctx.beginPath();ctx.arc(x,y,active?4:2,0,Math.PI*2);ctx.fill();if(active){const phase=reduced?0:now/1800%1;ctx.strokeStyle=`rgba(${ink},${.35*(1-phase)})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,8+phase*15,0,Math.PI*2);ctx.stroke();ctx.strokeStyle=`rgba(${ink},.2)`;ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.stroke();ctx.font='10px monospace';ctx.fillStyle=`rgba(${ink},.8)`;ctx.fillText(c.code,x+14,y+3);}}
-if(!reduced&&!globePinned&&now-lastGlobeChange>4200)selectCountry((selectedCountry+1)%countries.length);}
-selectCountry(0);resizeGlobe();
-new IntersectionObserver(entries=>{globeVisible=entries[0].isIntersecting;if(globeVisible){$('#audience').classList.add('in-view');resizeGlobe();lastGlobeChange=performance.now();drawGlobe(performance.now())}},{threshold:.08}).observe($('#audience'));
+// Audience figures stay selectable alongside the supplied globe video.
+const audienceVideo = $('#audience-video');
+const audienceMotion = $('#audience-motion');
+const countryButtons = [...document.querySelectorAll('.country')];
+let audienceVisible = false;
+let audiencePausedByUser = false;
+let audienceMotionOverride = false;
+function selectCountry(index) {
+  countryButtons.forEach((button, i) => {
+    button.classList.toggle('is-active', i === index);
+    button.setAttribute('aria-pressed', String(i === index));
+  });
+  $('#globe-country').textContent = countryButtons[index].querySelector('.country-name').textContent;
+  $('#globe-share').textContent = countryButtons[index].querySelector('.country-value').textContent;
+}
+countryButtons.forEach((button, index) => {
+  button.addEventListener('click', () => selectCountry(index));
+  button.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') selectCountry(index); });
+  button.addEventListener('focus', () => selectCountry(index));
+});
+selectCountry(0);
+function updateAudienceControl() {
+  const paused = audienceVideo.paused;
+  audienceMotion.setAttribute('aria-pressed', String(paused));
+  audienceMotion.setAttribute('aria-label', paused ? 'Play audience animation' : 'Pause audience animation');
+}
+function syncAudiencePlayback() {
+  if (!audienceVisible || document.hidden || audiencePausedByUser || (reducedQuery.matches && !audienceMotionOverride)) {
+    audienceVideo.pause();
+  } else {
+    audienceVideo.play().catch(updateAudienceControl);
+  }
+  updateAudienceControl();
+}
+audienceVideo.muted = true;
+audienceVideo.controls = false;
+audienceMotion.hidden = false;
+audienceMotion.addEventListener('click', () => {
+  audiencePausedByUser = !audienceVideo.paused;
+  audienceMotionOverride = !audiencePausedByUser;
+  syncAudiencePlayback();
+});
+for (const event of ['play', 'pause', 'loadeddata']) audienceVideo.addEventListener(event, updateAudienceControl);
+new IntersectionObserver(entries => {
+  audienceVisible = entries[0].isIntersecting;
+  if (audienceVisible) $('#audience').classList.add('in-view');
+  syncAudiencePlayback();
+}, { threshold: .1 }).observe($('.audience-visual'));
+document.addEventListener('visibilitychange', syncAudiencePlayback);
+reducedQuery.addEventListener('change', () => { audienceMotionOverride = false; syncAudiencePlayback(); });
 
 // The flower exists only in the closing dialog and starts on visitor activation.
 const bloomDialog=$('#bloom-dialog'),bloomTrigger=$('#bloom-trigger'),flower=$('#flower'),flowerStill=$('#flower-still');
@@ -122,10 +157,10 @@ const navigationLinks=[...document.querySelectorAll('.desktop-nav a')];
 new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){navigationLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+e.target.id));}}},{rootMargin:'-15% 0px -60% 0px',threshold:0}).observe($('#about'));
 for(const id of ['archive','projects','audience','contact'])new IntersectionObserver(entries=>{if(entries[0].isIntersecting)navigationLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+id));},{rootMargin:'-15% 0px -60% 0px',threshold:0}).observe(document.getElementById(id));
 
-reducedQuery.addEventListener('change',e=>{reduced=e.matches;greetingMotionOverride=false;if(reduced&&bloomDialog.open){flower.pause();flower.hidden=true;flowerStill.hidden=false;}scheduleGreeting();drawPortrait(performance.now());drawGlobe(performance.now());});
+reducedQuery.addEventListener('change',e=>{reduced=e.matches;greetingMotionOverride=false;if(reduced&&bloomDialog.open){flower.pause();flower.hidden=true;flowerStill.hidden=false;}scheduleGreeting();drawPortrait(performance.now());});
 document.addEventListener('visibilitychange',()=>{pageVisible=!document.hidden;scheduleGreeting();if(!pageVisible)flower.pause();else if(bloomDialog.open&&!reduced&&!flower.ended)flower.play().catch(()=>{});});
 let frame=0;
-function animate(now){frame++;if(pageVisible){if(layoutDirty)portraitLayout();if(!reduced||frame===1){drawPortrait(now);if(frame%2===0)drawGlobe(now);}}requestAnimationFrame(animate);}
+function animate(now){frame++;if(pageVisible){if(layoutDirty)portraitLayout();if(!reduced||frame===1){drawPortrait(now);}}requestAnimationFrame(animate);}
 requestAnimationFrame(animate);
 // Keep the address available without displaying a second contact line.
 const copyEmailButton = $('#copy-email');
