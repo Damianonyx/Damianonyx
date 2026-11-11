@@ -97,9 +97,9 @@ function drawPortrait(now){
   const rise=reduced?1:riseStart?Math.min(1,(now-riseStart)/1100):0,settle=1-(1-rise)**3;
   const oy=h-grid*scale+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2);
   const yaw=reduced?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:scale*.42;
-  // A tap scatters nearby cells outward along rays, then they fall back.
-  while(bursts.length&&now-bursts[0].start>950)bursts.shift();
-  const reach=Math.max(56,w*.2);
+  // A tap nudges a small ring of cells outward along rays, then they fall back.
+  while(bursts.length&&now-bursts[0].start>620)bursts.shift();
+  const reach=Math.max(34,w*.11);
   const fill=(list,ink)=>{
     ctx.fillStyle=ink;ctx.beginPath();
     for(let i=0;i<list.length;i+=2){
@@ -110,8 +110,8 @@ function drawPortrait(now){
         if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}
         for(const burst of bursts){
           const bx=x-burst.x,by=y-burst.y,far=Math.hypot(bx,by);if(far>=reach)continue;
-          const age=(now-burst.start)/950,swell=age<.22?1-(1-age/.22)**2:(1-(age-.22)/.78)**2;
-          const throwBy=swell*(1-far/reach)**.6*reach*(.3+.7*(((cx*73856093)^(cy*19349663))&255)/255);
+          const age=(now-burst.start)/620,swell=age<.22?1-(1-age/.22)**2:(1-(age-.22)/.78)**2;
+          const throwBy=swell*(1-far/reach)**.6*reach*.5*(.3+.7*(((cx*73856093)^(cy*19349663))&255)/255);
           x+=bx/(far||1)*throwBy;y+=by/(far||1)*throwBy;
         }
       }
