@@ -12,7 +12,7 @@ A responsive, single-page portfolio with a white, green and black pixel identity
 
 ## Features
 
-- A brief name reveal and a pixel portrait of my avatar that waves at visitors, then moves into the navigation when scrolling.
+- A brief name reveal and a pixel portrait of my avatar that rises into place, sways, scatters where it is tapped and moves into the navigation when scrolling.
 - A welcome greeting that cycles through English, Spanish, French, Chinese, Japanese, German, Turkish and Pidgin. Tap to pause or resume; scrolling pauses it.
 - An About section with a separate personal philosophy card.
 - An animated “My content” card featuring six topics: AI models, Large language models, RWA (Real World Assets), Technical writing, Crypto/blockchain and Open-source software.

@@ -49,74 +49,80 @@ let lastScrollY=scrollY;
 window.addEventListener('scroll',()=>{if(Math.abs(scrollY-lastScrollY)>1){userPaused=true;scheduleGreeting();enter();}lastScrollY=scrollY;},{passive:true});
 scheduleGreeting();
 
-// The brand avatar as a grid of flat-colour cells, continuously repositioned
-// into the header, with a forearm that waves at whoever is visiting.
+// The brand avatar as a one-bit style print: solid ink cells, dithered greys
+// and the beanie's green, continuously repositioned into the header.
 const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitContext=portraitCanvas.getContext('2d');
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
-const grid=128,waveFrames=13,wavePivot={x:25,y:116},waveSwing={middle:-4,reach:11};
-const colours=[],colourIndex=new Map(),thumbs={};
-let bodyCells=[],rimCells=[],armFrames=[];
-let portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true;
+const grid=144;
+// Cell classes written by scripts/generate-portrait-pixels.py, in draw order.
+const inks={
+  light:[null,'#0a0f0c','#8a958e','#1c6b3a','#2fae62','#ffffff'],
+  dark:[null,'#000000','#7f8f85','#1f7a44','#3ddc84','#eef6f0']
+};
+// On the dark page the black figure is traced in green so it keeps its shape.
+const rimInk='#2a9a57';
+const portraitCells=[[],[],[],[],[],[]],rimCells=[],thumbs={},bursts=[];
+let portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true,riseStart=0;
 let position={x:0,y:0,w:0,h:0},pointer={x:-999,y:-999};
-function loadImage(source){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=source;});}
-function readPixels(image){const buffer=document.createElement('canvas');buffer.width=image.naturalWidth;buffer.height=image.naturalHeight;const b=buffer.getContext('2d',{willReadFrequently:true});b.drawImage(image,0,0);return b.getImageData(0,0,buffer.width,buffer.height);}
-// On the dark theme the black clothing is lifted to a deep green-grey so the
-// figure keeps its shape against a near-black page.
-function colourOf(r,g,b){const key=r<<16|g<<8|b;let index=colourIndex.get(key);if(index===undefined){index=colours.length;colourIndex.set(key,index);const lift=(1-(.2126*r+.7152*g+.0722*b)/255)**2;colours.push({light:`rgb(${r},${g},${b})`,dark:`rgb(${Math.round(r+26*lift)},${Math.round(g+40*lift)},${Math.round(b+31*lift)})`});}return index;}
-function push(cells,index,x,y){(cells[index]||(cells[index]=[])).push(x,y);}
-function buildPortrait([figure,arm]){
-  const body=readPixels(figure),sprite=readPixels(arm);
-  const solid=(x,y)=>x>=0&&y>=0&&x<grid&&y<grid&&body.data[(y*grid+x)*4+3]>127;
-  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){if(!solid(x,y))continue;const i=(y*grid+x)*4;push(bodyCells,colourOf(body.data[i],body.data[i+1],body.data[i+2]),x,y);if(!(solid(x-1,y)&&solid(x+1,y)&&solid(x,y-1)&&solid(x,y+1)))rimCells.push(x,y);}
-  // Each wave frame is the forearm sprite turned about its elbow and snapped
-  // back onto the grid, so the motion stays as pixelated as the portrait.
-  const originX=9,originY=sprite.height-1;
-  for(let frame=0;frame<waveFrames;frame++){
-    const angle=(waveSwing.middle+waveSwing.reach*(frame/(waveFrames-1)*2-1))*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),cells=[];
-    for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){
-      const dx=x-wavePivot.x,dy=y-wavePivot.y;
-      const sx=Math.round(cos*dx+sin*dy)+originX,sy=Math.round(cos*dy-sin*dx)+originY;
-      if(sx<0||sy<0||sx>=sprite.width||sy>=sprite.height)continue;
-      const i=(sy*sprite.width+sx)*4;
-      if(sprite.data[i+3]>127)push(cells,colourOf(sprite.data[i],sprite.data[i+1],sprite.data[i+2]),x,y);
-    }
-    armFrames.push(cells);
-  }
+function buildPortrait(image){
+  const buffer=document.createElement('canvas');buffer.width=buffer.height=grid;
+  const b=buffer.getContext('2d',{willReadFrequently:true});b.drawImage(image,0,0,grid,grid);
+  const data=b.getImageData(0,0,grid,grid).data;
+  const kind=(x,y)=>x<0||y<0||x>=grid||y>=grid?-1:data[(y*grid+x)*4+3]>127?Math.round(data[(y*grid+x)*4]/40):0;
+  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){const cell=kind(x,y);if(!cell||!portraitCells[cell])continue;portraitCells[cell].push(x,y);if(cell===1&&!(kind(x-1,y)&&kind(x+1,y)&&kind(x,y-1)&&kind(x,y+1)))rimCells.push(x,y);}
   // A plain bitmap per theme serves the small copy that docks in the header.
   for(const theme of ['light','dark']){
-    const buffer=document.createElement('canvas');buffer.width=buffer.height=grid;const b=buffer.getContext('2d');
-    for(const cells of [bodyCells,armFrames[waveFrames>>1]])cells.forEach((list,index)=>{b.fillStyle=colours[index][theme];for(let i=0;i<list.length;i+=2)b.fillRect(list[i],list[i+1],1,1);});
-    thumbs[theme]=buffer;
+    const small=document.createElement('canvas');small.width=small.height=grid;const c=small.getContext('2d');
+    const paint=(list,ink)=>{c.fillStyle=ink;for(let i=0;i<list.length;i+=2)c.fillRect(list[i],list[i+1],1,1);};
+    portraitCells.forEach((list,cell)=>{if(inks[theme][cell])paint(list,inks[theme][cell]);});
+    if(theme==='dark')paint(rimCells,rimInk);
+    thumbs[theme]=small;
   }
   portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());
 }
-Promise.all([loadImage('assets/portrait-pixels.png'),loadImage('assets/portrait-wave.png')]).then(buildPortrait).catch(()=>portraitFloat.classList.add('ready'));
+const portraitImage=new Image();
+portraitImage.onload=()=>buildPortrait(portraitImage);portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait-pixels.png';
 function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;position={x:anchor.left+(dock.left-anchor.left)*eased,y:anchor.top+(dock.top-anchor.top)*eased,w:anchor.width+(small-anchor.width)*eased,h:anchor.height+(small-anchor.height)*eased};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.add('ready');const dpr=Math.min(devicePixelRatio||1,2);const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
-// Four waves, then a short rest with the hand held up.
-function waveFrame(t){const beat=t%4.3;const swing=reduced||beat>2.76?0:Math.sin(beat/.69*Math.PI*2);return armFrames[Math.round((swing+1)/2*(waveFrames-1))];}
 function drawPortrait(now){
   if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
   const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
   const theme=root.dataset.theme==='dark'?'dark':'light';
-  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],20,2,88,88,0,0,w,h);return;}
-  const t=reduced?0:now/1000;
-  const scale=Math.min(w/grid,h/grid)*.98,size=Math.max(.7,scale-Math.min(.5,scale*.1)),snap=portraitDpr;
-  const centre=w/2,oy=h-grid*scale;
-  // Cells stay on a true grid so the face reads clearly; the figure only bobs.
-  const drift=reduced?0:Math.round(Math.sin(t*.8)*1.2*snap)/snap;
-  const fill=(list,colour)=>{
-    ctx.fillStyle=colour;ctx.beginPath();
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],26,4,98,98,0,0,w,h);return;}
+  const t=reduced?0:now/1000,snap=portraitDpr;
+  const scale=Math.min(w/grid,h/grid),size=Math.ceil(scale*snap)/snap+(reduced?0:1/snap);
+  const centre=w/2;
+  // The print rises into place once, then sways: each row drifts a little
+  // out of step with its neighbours, as if the page were breathing.
+  if(!riseStart&&entered)riseStart=now;
+  const rise=reduced?1:riseStart?Math.min(1,(now-riseStart)/1100):0,settle=1-(1-rise)**3;
+  const oy=h-grid*scale+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2);
+  const yaw=reduced?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:scale*.42;
+  // A tap scatters nearby cells outward along rays, then they fall back.
+  while(bursts.length&&now-bursts[0].start>950)bursts.shift();
+  const reach=Math.max(56,w*.2);
+  const fill=(list,ink)=>{
+    ctx.fillStyle=ink;ctx.beginPath();
     for(let i=0;i<list.length;i+=2){
-      let x=centre+(list[i]-grid/2)*scale,y=oy+list[i+1]*scale+drift;
-      if(!reduced){const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}}
+      const cx=list[i],cy=list[i+1];
+      let x=centre+(cx-grid/2)*scale*yaw+Math.sin(cy*.055+t*1.3)*sway,y=oy+cy*scale;
+      if(!reduced){
+        const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);
+        if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}
+        for(const burst of bursts){
+          const bx=x-burst.x,by=y-burst.y,far=Math.hypot(bx,by);if(far>=reach)continue;
+          const age=(now-burst.start)/950,swell=age<.22?1-(1-age/.22)**2:(1-(age-.22)/.78)**2;
+          const throwBy=swell*(1-far/reach)**.6*reach*(.3+.7*(((cx*73856093)^(cy*19349663))&255)/255);
+          x+=bx/(far||1)*throwBy;y+=by/(far||1)*throwBy;
+        }
+      }
       ctx.rect(Math.round(x*snap)/snap,Math.round(y*snap)/snap,size,size);
     }
     ctx.fill();
   };
-  bodyCells.forEach((list,index)=>fill(list,colours[index][theme]));
-  if(theme==='dark')fill(rimCells,'#1f6b3d');
-  waveFrame(t).forEach((list,index)=>fill(list,colours[index][theme]));
+  portraitCells.forEach((list,cell)=>{if(inks[theme][cell])fill(list,inks[theme][cell]);});
+  if(theme==='dark')fill(rimCells,rimInk);
 }
+window.addEventListener('pointerdown',e=>{const x=e.clientX-position.x,y=e.clientY-position.y;if(reduced||position.w<75||x<0||y<0||x>position.w||y>position.h)return;bursts.push({x,y,start:performance.now()});if(bursts.length>4)bursts.shift();},{passive:true});
 window.addEventListener('pointermove',e=>{pointer={x:e.clientX-position.x,y:e.clientY-position.y}},{passive:true});
 window.addEventListener('pointerout',()=>{pointer={x:-999,y:-999}},{passive:true});
 window.addEventListener('scroll',()=>{layoutDirty=true;if(reduced){portraitLayout();drawPortrait(performance.now())}},{passive:true});
