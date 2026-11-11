@@ -108,7 +108,8 @@
       if (progress >= 1) transition = null;
     }
     const dark = document.documentElement.dataset.theme === 'dark';
-    const rgb = dark ? '244,247,252' : '35,42,52';
+    const rgb = dark ? '243,250,245' : '10,15,12';
+    const green = dark ? '61,220,132' : '21,128,61';
     const cx = width / 2, cy = height / 2;
     const cosLon = Math.cos(longitude), sinLon = Math.sin(longitude);
     const cosLat = Math.cos(latitude), sinLat = Math.sin(latitude);
@@ -119,9 +120,9 @@
     halo.addColorStop(1, `rgba(${rgb},0)`);
     ctx.fillStyle = halo; ctx.fillRect(0, 0, width, height);
     const body = ctx.createRadialGradient(cx - radius * .35, cy - radius * .4, 0, cx, cy, radius);
-    body.addColorStop(0, dark ? '#1c2027' : '#f4f5f7');
-    body.addColorStop(.65, dark ? '#111318' : '#f9fafb');
-    body.addColorStop(1, dark ? '#0d0e11' : '#ffffff');
+    body.addColorStop(0, dark ? '#142019' : '#f1f8f3');
+    body.addColorStop(.65, dark ? '#0b120e' : '#f9fcfa');
+    body.addColorStop(1, dark ? '#070b08' : '#ffffff');
     ctx.fillStyle = body; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = `rgba(${rgb},.15)`; ctx.lineWidth = .7; ctx.stroke();
 
@@ -155,7 +156,7 @@
       buckets[brightness].push(cx + p[0] * radius, cy - p[1] * radius, size);
     }
     buckets.forEach((bucket, i) => {
-      ctx.fillStyle = `rgba(${rgb},${(dark ? .22 : .24) + i * .09})`;
+      ctx.fillStyle = `rgba(${green},${(dark ? .22 : .24) + i * .09})`;
       ctx.beginPath();
       for (let j = 0; j < bucket.length; j += 3) ctx.rect(bucket[j], bucket[j + 1], bucket[j + 2], bucket[j + 2]);
       ctx.fill();
@@ -169,20 +170,20 @@
       if (p[2] < .03) continue; // Markers on the far side stay behind the earth.
       const x = cx + p[0] * radius, y = cy - p[1] * radius, active = index === selected;
       hits.push({ x, y, index });
-      ctx.fillStyle = dark ? '#101114' : '#fff';
+      ctx.fillStyle = dark ? '#060907' : '#fff';
       ctx.beginPath(); ctx.arc(x, y, active ? 6 : 4, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(${rgb},${active ? 1 : .7})`; ctx.lineWidth = active ? 1.8 : 1.1;
+      ctx.strokeStyle = `rgba(${active ? green : rgb},${active ? 1 : .7})`; ctx.lineWidth = active ? 1.8 : 1.1;
       ctx.stroke();
-      ctx.fillStyle = `rgba(${rgb},${active ? 1 : .65})`;
+      ctx.fillStyle = `rgba(${active ? green : rgb},${active ? 1 : .65})`;
       ctx.beginPath(); ctx.arc(x, y, active ? 3 : 1.6, 0, Math.PI * 2); ctx.fill();
       if (active) {
         const pulse = paused || reduce.matches ? .35 : (now % 1900) / 1900;
-        ctx.strokeStyle = `rgba(${rgb},${.4 * (1 - pulse)})`; ctx.lineWidth = 1;
+        ctx.strokeStyle = `rgba(${green},${.55 * (1 - pulse)})`; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(x, y, 10 + pulse * 9, 0, Math.PI * 2); ctx.stroke();
         ctx.font = `500 ${width < 350 ? 11 : 12}px monospace`;
         const text = country.code, tw = ctx.measureText(text).width;
         const labelX = Math.min(width - tw - 24, x + 23);
-        ctx.fillStyle = dark ? 'rgba(15,17,22,.92)' : 'rgba(255,255,255,.95)';
+        ctx.fillStyle = dark ? 'rgba(6,9,7,.92)' : 'rgba(255,255,255,.95)';
         ctx.beginPath(); ctx.roundRect(labelX - 7, y - 13, tw + 14, 26, 6); ctx.fill();
         ctx.fillStyle = `rgba(${rgb},1)`; ctx.textBaseline = 'middle'; ctx.fillText(text, labelX, y);
       }

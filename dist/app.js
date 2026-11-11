@@ -5,9 +5,15 @@ const reducedQuery=matchMedia('(prefers-reduced-motion: reduce)');
 let reduced=reducedQuery.matches;
 let pageVisible=!document.hidden;
 const themeButton=$('#theme-toggle');
-function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#101012':'#ffffff';}
+const themeQuery=matchMedia('(prefers-color-scheme: dark)');
+function savedTheme(){try{const theme=localStorage.getItem('geek-theme');return theme==='dark'||theme==='light'?theme:null}catch{return null}}
+function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#060907':'#ffffff';}
+function applyTheme(theme){root.dataset.theme=theme;updateThemeButton();drawPortrait(performance.now());}
 updateThemeButton();
-themeButton.addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('geek-theme',root.dataset.theme)}catch{}updateThemeButton();drawPortrait(performance.now());});
+// The device setting decides the theme until the visitor picks one. Picking
+// the theme the device already uses hands control back to the device.
+themeButton.addEventListener('click',()=>{const next=root.dataset.theme==='dark'?'light':'dark';const system=themeQuery.matches?'dark':'light';try{if(next===system)localStorage.removeItem('geek-theme');else localStorage.setItem('geek-theme',next)}catch{}applyTheme(next);});
+themeQuery.addEventListener('change',event=>{if(!savedTheme())applyTheme(event.matches?'dark':'light')});
 const entrance=$('#entrance');
 let entered=false;
 function enter(){if(entered)return;entered=true;entrance.classList.add('is-gone');}
@@ -43,17 +49,80 @@ let lastScrollY=scrollY;
 window.addEventListener('scroll',()=>{if(Math.abs(scrollY-lastScrollY)>1){userPaused=true;scheduleGreeting();enter();}lastScrollY=scrollY;},{passive:true});
 scheduleGreeting();
 
-// An actual sampled pixel portrait, continuously repositioned into the header.
+// The brand avatar as a one-bit style print: solid ink cells, dithered greys
+// and the beanie's green, continuously repositioned into the header.
 const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitContext=portraitCanvas.getContext('2d');
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
-const portraitImage=new Image();
-let points=[],portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true;
+const grid=144;
+// Cell classes written by scripts/generate-portrait-pixels.py, in draw order.
+const inks={
+  light:[null,'#0a0f0c','#8a958e','#1c6b3a','#2fae62','#ffffff'],
+  dark:[null,'#000000','#7f8f85','#1f7a44','#3ddc84','#eef6f0']
+};
+// On the dark page the black figure is traced in green so it keeps its shape.
+const rimInk='#2a9a57';
+const portraitCells=[[],[],[],[],[],[]],rimCells=[],thumbs={},bursts=[];
+let portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true,riseStart=0;
 let position={x:0,y:0,w:0,h:0},pointer={x:-999,y:-999};
-const gridW=144,gridH=158;
-function samplePortrait(){const buffer=document.createElement('canvas');buffer.width=gridW;buffer.height=gridH;const b=buffer.getContext('2d',{willReadFrequently:true});const ratio=portraitImage.naturalWidth/1536;b.drawImage(portraitImage,170*ratio,190*ratio,1210*ratio,1346*ratio,0,0,gridW,gridH);const values=b.getImageData(0,0,gridW,gridH).data;points=[];for(let y=0;y<gridH;y++)for(let x=0;x<gridW;x++){const i=(y*gridW+x)*4;const lum=.2126*values[i]+.7152*values[i+1]+.0722*values[i+2];if(lum<205){const level=lum<65?0:lum<130?1:2;if(level===2&&(x+y)%2)continue;points.push({x,y,level});}}portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());}
-portraitImage.onload=samplePortrait;portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait.webp';
+function buildPortrait(image){
+  const buffer=document.createElement('canvas');buffer.width=buffer.height=grid;
+  const b=buffer.getContext('2d',{willReadFrequently:true});b.drawImage(image,0,0,grid,grid);
+  const data=b.getImageData(0,0,grid,grid).data;
+  const kind=(x,y)=>x<0||y<0||x>=grid||y>=grid?-1:data[(y*grid+x)*4+3]>127?Math.round(data[(y*grid+x)*4]/40):0;
+  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){const cell=kind(x,y);if(!cell||!portraitCells[cell])continue;portraitCells[cell].push(x,y);if(cell===1&&!(kind(x-1,y)&&kind(x+1,y)&&kind(x,y-1)&&kind(x,y+1)))rimCells.push(x,y);}
+  // A plain bitmap per theme serves the small copy that docks in the header.
+  for(const theme of ['light','dark']){
+    const small=document.createElement('canvas');small.width=small.height=grid;const c=small.getContext('2d');
+    const paint=(list,ink)=>{c.fillStyle=ink;for(let i=0;i<list.length;i+=2)c.fillRect(list[i],list[i+1],1,1);};
+    portraitCells.forEach((list,cell)=>{if(inks[theme][cell])paint(list,inks[theme][cell]);});
+    if(theme==='dark')paint(rimCells,rimInk);
+    thumbs[theme]=small;
+  }
+  portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());
+}
+const portraitImage=new Image();
+portraitImage.onload=()=>buildPortrait(portraitImage);portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait-pixels.png';
 function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;position={x:anchor.left+(dock.left-anchor.left)*eased,y:anchor.top+(dock.top-anchor.top)*eased,w:anchor.width+(small-anchor.width)*eased,h:anchor.height+(small-anchor.height)*eased};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.add('ready');const dpr=Math.min(devicePixelRatio||1,2);const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
-function drawPortrait(now){if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);const t=reduced?0:now/1000;const dark=root.dataset.theme==='dark';const colors=dark?['#ededf0','#a5a5ae','#5c5c65']:['#171719','#69696f','#a8a8af'];const isSmall=w<75;const scale=Math.min(w/gridW,h/gridH)*(isSmall?1.25:.98);const ox=(w-gridW*scale)/2,oy=(h-gridH*scale)+(isSmall?h*.07:0);const yaw=reduced?1:.987+Math.sin(t*.65)*.012;const drift=reduced||isSmall?0:Math.sin(t*.8)*1.2;for(let level=0;level<3;level++){ctx.fillStyle=colors[level];ctx.beginPath();for(const pt of points){if(pt.level!==level)continue;let x=ox+gridW*scale/2+(pt.x-gridW/2)*scale*yaw;let y=oy+pt.y*scale+drift;if(!reduced&&!isSmall){x+=Math.sin(pt.y*.055+t*1.3)*scale*.42;const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}}ctx.rect(Math.round(x),Math.round(y),Math.max(.7,scale*.93),Math.max(.7,scale*.93));}ctx.fill();}}
+function drawPortrait(now){
+  if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
+  const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
+  const theme=root.dataset.theme==='dark'?'dark':'light';
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],26,4,98,98,0,0,w,h);return;}
+  const t=reduced?0:now/1000,snap=portraitDpr;
+  const scale=Math.min(w/grid,h/grid),size=Math.ceil(scale*snap)/snap+(reduced?0:1/snap);
+  const centre=w/2;
+  // The print rises into place once, then sways: each row drifts a little
+  // out of step with its neighbours, as if the page were breathing.
+  if(!riseStart&&entered)riseStart=now;
+  const rise=reduced?1:riseStart?Math.min(1,(now-riseStart)/1100):0,settle=1-(1-rise)**3;
+  const oy=h-grid*scale+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2);
+  const yaw=reduced?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:scale*.42;
+  // A tap nudges a small ring of cells outward along rays, then they fall back.
+  while(bursts.length&&now-bursts[0].start>620)bursts.shift();
+  const reach=Math.max(34,w*.11);
+  const fill=(list,ink)=>{
+    ctx.fillStyle=ink;ctx.beginPath();
+    for(let i=0;i<list.length;i+=2){
+      const cx=list[i],cy=list[i+1];
+      let x=centre+(cx-grid/2)*scale*yaw+Math.sin(cy*.055+t*1.3)*sway,y=oy+cy*scale;
+      if(!reduced){
+        const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);
+        if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}
+        for(const burst of bursts){
+          const bx=x-burst.x,by=y-burst.y,far=Math.hypot(bx,by);if(far>=reach)continue;
+          const age=(now-burst.start)/620,swell=age<.22?1-(1-age/.22)**2:(1-(age-.22)/.78)**2;
+          const throwBy=swell*(1-far/reach)**.6*reach*.5*(.3+.7*(((cx*73856093)^(cy*19349663))&255)/255);
+          x+=bx/(far||1)*throwBy;y+=by/(far||1)*throwBy;
+        }
+      }
+      ctx.rect(Math.round(x*snap)/snap,Math.round(y*snap)/snap,size,size);
+    }
+    ctx.fill();
+  };
+  portraitCells.forEach((list,cell)=>{if(inks[theme][cell])fill(list,inks[theme][cell]);});
+  if(theme==='dark')fill(rimCells,rimInk);
+}
+window.addEventListener('pointerdown',e=>{const x=e.clientX-position.x,y=e.clientY-position.y;if(reduced||position.w<75||x<0||y<0||x>position.w||y>position.h)return;bursts.push({x,y,start:performance.now()});if(bursts.length>4)bursts.shift();},{passive:true});
 window.addEventListener('pointermove',e=>{pointer={x:e.clientX-position.x,y:e.clientY-position.y}},{passive:true});
 window.addEventListener('pointerout',()=>{pointer={x:-999,y:-999}},{passive:true});
 window.addEventListener('scroll',()=>{layoutDirty=true;if(reduced){portraitLayout();drawPortrait(performance.now())}},{passive:true});
