@@ -5,9 +5,15 @@ const reducedQuery=matchMedia('(prefers-reduced-motion: reduce)');
 let reduced=reducedQuery.matches;
 let pageVisible=!document.hidden;
 const themeButton=$('#theme-toggle');
-function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#101012':'#ffffff';}
+const themeQuery=matchMedia('(prefers-color-scheme: dark)');
+function savedTheme(){try{const theme=localStorage.getItem('geek-theme');return theme==='dark'||theme==='light'?theme:null}catch{return null}}
+function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#060907':'#ffffff';}
+function applyTheme(theme){root.dataset.theme=theme;updateThemeButton();drawPortrait(performance.now());}
 updateThemeButton();
-themeButton.addEventListener('click',()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('geek-theme',root.dataset.theme)}catch{}updateThemeButton();drawPortrait(performance.now());});
+// The device setting decides the theme until the visitor picks one. Picking
+// the theme the device already uses hands control back to the device.
+themeButton.addEventListener('click',()=>{const next=root.dataset.theme==='dark'?'light':'dark';const system=themeQuery.matches?'dark':'light';try{if(next===system)localStorage.removeItem('geek-theme');else localStorage.setItem('geek-theme',next)}catch{}applyTheme(next);});
+themeQuery.addEventListener('change',event=>{if(!savedTheme())applyTheme(event.matches?'dark':'light')});
 const entrance=$('#entrance');
 let entered=false;
 function enter(){if(entered)return;entered=true;entrance.classList.add('is-gone');}
@@ -43,17 +49,74 @@ let lastScrollY=scrollY;
 window.addEventListener('scroll',()=>{if(Math.abs(scrollY-lastScrollY)>1){userPaused=true;scheduleGreeting();enter();}lastScrollY=scrollY;},{passive:true});
 scheduleGreeting();
 
-// An actual sampled pixel portrait, continuously repositioned into the header.
+// The brand avatar as a grid of flat-colour cells, continuously repositioned
+// into the header, with a forearm that waves at whoever is visiting.
 const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitContext=portraitCanvas.getContext('2d');
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
-const portraitImage=new Image();
-let points=[],portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true;
+const grid=128,waveFrames=13,wavePivot={x:25,y:116},waveSwing={middle:-4,reach:11};
+const colours=[],colourIndex=new Map(),thumbs={};
+let bodyCells=[],rimCells=[],armFrames=[];
+let portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true;
 let position={x:0,y:0,w:0,h:0},pointer={x:-999,y:-999};
-const gridW=144,gridH=158;
-function samplePortrait(){const buffer=document.createElement('canvas');buffer.width=gridW;buffer.height=gridH;const b=buffer.getContext('2d',{willReadFrequently:true});const ratio=portraitImage.naturalWidth/1536;b.drawImage(portraitImage,170*ratio,190*ratio,1210*ratio,1346*ratio,0,0,gridW,gridH);const values=b.getImageData(0,0,gridW,gridH).data;points=[];for(let y=0;y<gridH;y++)for(let x=0;x<gridW;x++){const i=(y*gridW+x)*4;const lum=.2126*values[i]+.7152*values[i+1]+.0722*values[i+2];if(lum<205){const level=lum<65?0:lum<130?1:2;if(level===2&&(x+y)%2)continue;points.push({x,y,level});}}portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());}
-portraitImage.onload=samplePortrait;portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait.webp';
+function loadImage(source){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=source;});}
+function readPixels(image){const buffer=document.createElement('canvas');buffer.width=image.naturalWidth;buffer.height=image.naturalHeight;const b=buffer.getContext('2d',{willReadFrequently:true});b.drawImage(image,0,0);return b.getImageData(0,0,buffer.width,buffer.height);}
+// On the dark theme the black clothing is lifted to a deep green-grey so the
+// figure keeps its shape against a near-black page.
+function colourOf(r,g,b){const key=r<<16|g<<8|b;let index=colourIndex.get(key);if(index===undefined){index=colours.length;colourIndex.set(key,index);const lift=(1-(.2126*r+.7152*g+.0722*b)/255)**2;colours.push({light:`rgb(${r},${g},${b})`,dark:`rgb(${Math.round(r+26*lift)},${Math.round(g+40*lift)},${Math.round(b+31*lift)})`});}return index;}
+function push(cells,index,x,y){(cells[index]||(cells[index]=[])).push(x,y);}
+function buildPortrait([figure,arm]){
+  const body=readPixels(figure),sprite=readPixels(arm);
+  const solid=(x,y)=>x>=0&&y>=0&&x<grid&&y<grid&&body.data[(y*grid+x)*4+3]>127;
+  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){if(!solid(x,y))continue;const i=(y*grid+x)*4;push(bodyCells,colourOf(body.data[i],body.data[i+1],body.data[i+2]),x,y);if(!(solid(x-1,y)&&solid(x+1,y)&&solid(x,y-1)&&solid(x,y+1)))rimCells.push(x,y);}
+  // Each wave frame is the forearm sprite turned about its elbow and snapped
+  // back onto the grid, so the motion stays as pixelated as the portrait.
+  const originX=9,originY=sprite.height-1;
+  for(let frame=0;frame<waveFrames;frame++){
+    const angle=(waveSwing.middle+waveSwing.reach*(frame/(waveFrames-1)*2-1))*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle),cells=[];
+    for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){
+      const dx=x-wavePivot.x,dy=y-wavePivot.y;
+      const sx=Math.round(cos*dx+sin*dy)+originX,sy=Math.round(cos*dy-sin*dx)+originY;
+      if(sx<0||sy<0||sx>=sprite.width||sy>=sprite.height)continue;
+      const i=(sy*sprite.width+sx)*4;
+      if(sprite.data[i+3]>127)push(cells,colourOf(sprite.data[i],sprite.data[i+1],sprite.data[i+2]),x,y);
+    }
+    armFrames.push(cells);
+  }
+  // A plain bitmap per theme serves the small copy that docks in the header.
+  for(const theme of ['light','dark']){
+    const buffer=document.createElement('canvas');buffer.width=buffer.height=grid;const b=buffer.getContext('2d');
+    for(const cells of [bodyCells,armFrames[waveFrames>>1]])cells.forEach((list,index)=>{b.fillStyle=colours[index][theme];for(let i=0;i<list.length;i+=2)b.fillRect(list[i],list[i+1],1,1);});
+    thumbs[theme]=buffer;
+  }
+  portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());
+}
+Promise.all([loadImage('assets/portrait-pixels.png'),loadImage('assets/portrait-wave.png')]).then(buildPortrait).catch(()=>portraitFloat.classList.add('ready'));
 function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;position={x:anchor.left+(dock.left-anchor.left)*eased,y:anchor.top+(dock.top-anchor.top)*eased,w:anchor.width+(small-anchor.width)*eased,h:anchor.height+(small-anchor.height)*eased};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.add('ready');const dpr=Math.min(devicePixelRatio||1,2);const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
-function drawPortrait(now){if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);const t=reduced?0:now/1000;const dark=root.dataset.theme==='dark';const colors=dark?['#ededf0','#a5a5ae','#5c5c65']:['#171719','#69696f','#a8a8af'];const isSmall=w<75;const scale=Math.min(w/gridW,h/gridH)*(isSmall?1.25:.98);const ox=(w-gridW*scale)/2,oy=(h-gridH*scale)+(isSmall?h*.07:0);const yaw=reduced?1:.987+Math.sin(t*.65)*.012;const drift=reduced||isSmall?0:Math.sin(t*.8)*1.2;for(let level=0;level<3;level++){ctx.fillStyle=colors[level];ctx.beginPath();for(const pt of points){if(pt.level!==level)continue;let x=ox+gridW*scale/2+(pt.x-gridW/2)*scale*yaw;let y=oy+pt.y*scale+drift;if(!reduced&&!isSmall){x+=Math.sin(pt.y*.055+t*1.3)*scale*.42;const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}}ctx.rect(Math.round(x),Math.round(y),Math.max(.7,scale*.93),Math.max(.7,scale*.93));}ctx.fill();}}
+// Four waves, then a short rest with the hand held up.
+function waveFrame(t){const beat=t%4.3;const swing=reduced||beat>2.76?0:Math.sin(beat/.69*Math.PI*2);return armFrames[Math.round((swing+1)/2*(waveFrames-1))];}
+function drawPortrait(now){
+  if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
+  const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
+  const theme=root.dataset.theme==='dark'?'dark':'light';
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],20,2,88,88,0,0,w,h);return;}
+  const t=reduced?0:now/1000;
+  const scale=Math.min(w/grid,h/grid)*.98,size=Math.max(.7,scale-Math.min(.5,scale*.1)),snap=portraitDpr;
+  const centre=w/2,oy=h-grid*scale;
+  // Cells stay on a true grid so the face reads clearly; the figure only bobs.
+  const drift=reduced?0:Math.round(Math.sin(t*.8)*1.2*snap)/snap;
+  const fill=(list,colour)=>{
+    ctx.fillStyle=colour;ctx.beginPath();
+    for(let i=0;i<list.length;i+=2){
+      let x=centre+(list[i]-grid/2)*scale,y=oy+list[i+1]*scale+drift;
+      if(!reduced){const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}}
+      ctx.rect(Math.round(x*snap)/snap,Math.round(y*snap)/snap,size,size);
+    }
+    ctx.fill();
+  };
+  bodyCells.forEach((list,index)=>fill(list,colours[index][theme]));
+  if(theme==='dark')fill(rimCells,'#1f6b3d');
+  waveFrame(t).forEach((list,index)=>fill(list,colours[index][theme]));
+}
 window.addEventListener('pointermove',e=>{pointer={x:e.clientX-position.x,y:e.clientY-position.y}},{passive:true});
 window.addEventListener('pointerout',()=>{pointer={x:-999,y:-999}},{passive:true});
 window.addEventListener('scroll',()=>{layoutDirty=true;if(reduced){portraitLayout();drawPortrait(performance.now())}},{passive:true});

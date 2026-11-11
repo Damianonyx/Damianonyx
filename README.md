@@ -8,11 +8,11 @@ My work sits around AI, Web3, technical writing, research, storytelling and the 
 
 ## Overview
 
-A responsive, single-page portfolio with a monochrome pixel identity, readable typography and subtle motion. It brings together my writing, research, experiments and builds.
+A responsive, single-page portfolio with a white, green and black pixel identity, readable typography and subtle motion. It brings together my writing, research, experiments and builds.
 
 ## Features
 
-- A brief name reveal and animated pixel portrait that moves into the navigation when scrolling.
+- A brief name reveal and a pixel portrait of my avatar that waves at visitors, then moves into the navigation when scrolling.
 - A welcome greeting that cycles through English, Spanish, French, Chinese, Japanese, German, Turkish and Pidgin. Tap to pause or resume; scrolling pauses it.
 - An About section with a separate personal philosophy card.
 - An animated “My content” card featuring six topics: AI models, Large language models, RWA (Real World Assets), Technical writing, Crypto/blockchain and Open-source software.
@@ -21,7 +21,7 @@ A responsive, single-page portfolio with a monochrome pixel identity, readable t
 - An audience visualisation based on the supplied three-month impressions snapshot.
 - Direct contact and publication links.
 - A closing “Let’s Bloom” flower animation, revealed on activation.
-- Light and dark themes that remember the visitor’s explicit choice.
+- Light and dark themes that follow the device setting until the visitor picks one, then remember that choice.
 - Responsive mobile layouts, keyboard controls, visible focus states and reduced-motion support.
 - Favicons, an Apple touch icon and social-sharing metadata.
 
