@@ -55,11 +55,11 @@ const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitCon
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
 const grid=144;
 // Cell classes written by scripts/generate-portrait-pixels.py: ink, dark grey,
-// light grey, paper, green, bright green. On the dark page the ink is lifted
-// to charcoal so the black clothing still reads against a near-black page.
+// light grey, paper, green, bright green. On the dark page the ink is pure
+// black, so the clothing sinks into the page and the face and beanie stand out.
 const inks={
   light:[null,'#0a0f0c','#5f6963','#a5b0a9','#ffffff','#1c6b3a','#2fae62'],
-  dark:[null,'#262f29','#68746d','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
+  dark:[null,'#000000','#68746d','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
 };
 // Each class is kept twice: as single cells, and as row runs for quick drawing.
 const portraitCells=inks.light.map(()=>[]),portraitRuns=inks.light.map(()=>[]),thumbs={},bursts=[];
@@ -75,8 +75,9 @@ function buildPortrait(image){
     if(cell!==last){if(portraitRuns[last]&&last)portraitRuns[last].push(start,y,x-start);start=x;last=cell;}
     if(cell&&portraitCells[cell])portraitCells[cell].push(x,y);
   }
-  // A plain bitmap per theme serves the small copy that docks in the header.
-  for(const theme of ['light','dark']){
+  // A plain bitmap serves the small copy that docks in the header. It keeps
+  // the light print in both themes and sits on a light disc on the dark page.
+  for(const theme of ['light']){
     const small=document.createElement('canvas');small.width=small.height=grid;const c=small.getContext('2d');
     portraitRuns.forEach((runs,cell)=>{if(!cell)return;c.fillStyle=inks[theme][cell];for(let i=0;i<runs.length;i+=3)c.fillRect(runs[i],runs[i+1],runs[i+2],1);});
     thumbs[theme]=small;
@@ -85,12 +86,12 @@ function buildPortrait(image){
 }
 const portraitImage=new Image();
 portraitImage.onload=()=>buildPortrait(portraitImage);portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait-pixels.png';
-function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;const dpr=Math.min(devicePixelRatio||1,3),fit=v=>Math.round(v*dpr)/dpr;position={x:fit(anchor.left+(dock.left-anchor.left)*eased),y:fit(anchor.top+(dock.top-anchor.top)*eased),w:fit(anchor.width+(small-anchor.width)*eased),h:fit(anchor.height+(small-anchor.height)*eased)};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.add('ready');const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
+function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;const dpr=Math.min(devicePixelRatio||1,3),fit=v=>Math.round(v*dpr)/dpr;position={x:fit(anchor.left+(dock.left-anchor.left)*eased),y:fit(anchor.top+(dock.top-anchor.top)*eased),w:fit(anchor.width+(small-anchor.width)*eased),h:fit(anchor.height+(small-anchor.height)*eased)};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.toggle('compact',position.w<75);portraitFloat.classList.add('ready');const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
 function drawPortrait(now){
   if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
   const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
   const theme=root.dataset.theme==='dark'?'dark':'light';
-  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],27,4,96,96,0,0,w,h);return;}
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs.light,27,4,96,96,0,0,w,h);return;}
   const t=reduced?0:now/1000,snap=portraitDpr,px=v=>Math.round(v*snap)/snap;
   // Small cells are held to whole device pixels, where that costs little size,
   // so the dither stays even.

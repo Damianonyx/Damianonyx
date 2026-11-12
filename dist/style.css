@@ -128,3 +128,5 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline-color:var(
 .portrait-float.docked{mask-image:none}
 @media(max-width:760px){.hero-art{width:min(420px,92vw);height:clamp(230px,47svh,420px)}.greeting{min-height:120px}}
 @media(max-height:620px){.hero-art{height:clamp(220px,52svh,300px)}}
+/* On the dark page the small header portrait is a light card, so the black print stays readable. */
+[data-theme=dark] .portrait-float.compact{background:#f4f7f2;border-radius:50%;mask-image:none}
