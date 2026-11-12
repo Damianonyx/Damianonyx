@@ -1,7 +1,8 @@
 """Build the hero's pixel portrait data from the brand avatar.
 
-Cuts the character out of its dotted backdrop and reduces it to a small grid
-of ink, dithered grey and two greens, in the manner of a one-bit print.
+Cuts the character out of its dotted backdrop, shrinks it smoothly to a small
+grid and sorts each cell by brightness into ink, two greys or paper, the way
+the site's first portrait was sampled. The beanie and eyes keep their green.
 Usage: python scripts/generate-portrait-pixels.py /path/to/avatar.png
 """
 import sys
@@ -11,13 +12,16 @@ import numpy as np
 from PIL import Image
 
 GRID = 144           # cells per side of the pixel portrait
-WORK = 1152          # working resolution for the cut-out (GRID * 8)
-POCKETS = ((785, 757), (854, 747), (950, 432))  # paper fenced in by hair and chain, at WORK resolution
-EMPTY, INK, GREY, GREEN, LEAF, PAPER = range(6)  # cell classes; the page maps them to theme colours
+BLOCK = 8            # source pixels averaged per cell side
+WORK = GRID * BLOCK  # working resolution
+# Paper fenced in by hair and the glasses chain, as fractions of the image.
+POCKETS = ((.6816, .6572), (.7412, .6484), (.8242, .3750))
+# Cell classes; the page maps them to theme colours.
+EMPTY, INK, DARK, LIGHT, PAPER, GREEN, LEAF = range(7)
 assets = Path(__file__).resolve().parents[1] / 'dist/assets'
 
 source = Image.open(sys.argv[1]).convert('RGB')
-work = np.asarray(source.resize((WORK, WORK), Image.LANCZOS)).astype(np.int16)
+work = np.asarray(source.resize((WORK, WORK), Image.LANCZOS)).astype(np.float32)
 
 
 def spread(mask):
@@ -41,56 +45,43 @@ def flood(seeds, passable):
 
 # The backdrop is cream paper with grey halftone dots: bright and unsaturated.
 # Flood from the top and side edges so enclosed skin and silver stay put.
-luminance = work.mean(axis=2)
-chroma = work.max(axis=2) - work.min(axis=2)
-paper = (chroma < 30) & (luminance > 105)
+paper = (work.max(axis=2) - work.min(axis=2) < 30) & (work.mean(axis=2) > 105)
 seeds = np.zeros_like(paper)
 seeds[0] = seeds[:, 0] = seeds[:, -1] = True
 for x, y in POCKETS:
-    seeds[y, x] = True
+    column, row = int(x * WORK), int(y * WORK)
+    seeds[row - 3:row + 4, column - 3:column + 4] = True
 backdrop = flood(seeds, paper)
-backdrop = spread(spread(backdrop))  # swallow the anti-aliased fringe
+for _ in range(3):
+    backdrop = spread(backdrop)  # swallow the anti-aliased fringe
 
 # Keep only the figure itself; this drops the handle lettered beside it.
 centre = np.zeros_like(paper)
 centre[WORK // 2, WORK // 2] = True
 figure = flood(centre, ~backdrop)
 
-# Gather each cell's pixels, then judge it by coverage, tone and hue.
-block = WORK // GRID
-
 
 def cells(values):
-    return values.reshape(GRID, block, GRID, block).transpose(0, 2, 1, 3).reshape(GRID, GRID, -1)
+    return values.reshape(GRID, BLOCK, GRID, BLOCK).transpose(0, 2, 1, 3).reshape(GRID, GRID, -1)
 
 
+# Average each cell over the figure's own pixels. Averaging is what gives the
+# print its soft edges: a line crossing a cell leaves a grey, not a hard step.
 inside = cells(figure)
-solid = inside.mean(axis=2) > .5
+cover = inside.mean(axis=2)
 count = np.maximum(inside.sum(axis=2), 1)
-red, green, blue = (np.where(inside, cells(work[..., c]), 0).sum(axis=2) / count for c in range(3))
-tone = (red + green + blue) / 3
-lines = (cells(luminance < 32) & inside).sum(axis=2) / count   # share of line art in the cell
-leafy = (green > red * 1.22) & (green > blue * 1.12) & (green - np.minimum(red, blue) > 14)
-
+red, green, blue = (np.where(inside, cells(work[..., channel]), 0).sum(axis=2) / count for channel in range(3))
+luminance = .2126 * red + .7152 * green + .0722 * blue
+leafy = (green > red * 1.15) & (green > blue * 1.08) & (green - np.minimum(red, blue) > 12)
 rows, columns = np.indices((GRID, GRID))
-checker = (rows + columns) % 2 == 0
-sparse = (rows % 2 == 0) & (columns % 2 == 0)
-
-
-def shade(where, pattern, value):
-    grid[where & pattern] = value
-
 
 grid = np.full((GRID, GRID), PAPER, np.uint8)
-shade((tone >= 125) & (tone < 200), sparse, GREY)      # light tones: scattered grey
-shade((tone >= 70) & (tone < 125), checker, INK)       # mid tones: checkerboard
-shade((tone >= 34) & (tone < 70), checker | sparse, INK)  # dark tones: mostly ink
-grid[(tone < 34) | (lines > .33)] = INK
-grid[leafy & (tone >= 34)] = GREEN
-shade(leafy & (tone >= 34) & (tone < 47), checker, INK)   # folds of the beanie
-grid[leafy & (tone >= 90)] = LEAF
-grid[leafy & (lines > .4)] = INK                          # ribs of the beanie
-grid[~solid] = EMPTY
+grid[(luminance < 205) & ((rows + columns) % 2 == 0)] = LIGHT   # lightest tone is a checkerboard
+grid[luminance < 130] = DARK
+grid[luminance < 65] = INK
+grid[leafy & (luminance >= 30)] = GREEN
+grid[leafy & (luminance >= 105) & (green - np.maximum(red, blue) > 40) & (cover > .95)] = LEAF  # the eyes, not edge fringe
+grid[cover < .5] = EMPTY
 
 # One byte per cell: the class in the red channel, opaque inside the figure.
 pixels = np.zeros((GRID, GRID, 4), np.uint8)
@@ -102,4 +93,5 @@ Image.fromarray(pixels, 'RGBA').save(assets / 'portrait-pixels.png', optimize=Tr
 source.resize((1000, 1000), Image.LANCZOS).save(assets / 'portrait.webp', quality=86, method=6)
 for name in ('portrait-pixels.png', 'portrait.webp'):
     print(f'{name}: {(assets / name).stat().st_size:,} bytes')
-print('Cells:', {label: int((grid == value).sum()) for label, value in (('ink', INK), ('grey', GREY), ('green', GREEN), ('leaf', LEAF))})
+names = ('ink', 'dark', 'light', 'paper', 'green', 'leaf')
+print('Cells:', {name: int((grid == kind).sum()) for name, kind in zip(names, (INK, DARK, LIGHT, PAPER, GREEN, LEAF))})

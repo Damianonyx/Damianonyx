@@ -49,78 +49,91 @@ let lastScrollY=scrollY;
 window.addEventListener('scroll',()=>{if(Math.abs(scrollY-lastScrollY)>1){userPaused=true;scheduleGreeting();enter();}lastScrollY=scrollY;},{passive:true});
 scheduleGreeting();
 
-// The brand avatar as a one-bit style print: solid ink cells, dithered greys
-// and the beanie's green, continuously repositioned into the header.
+// The brand avatar as a soft print on a small grid: ink, two greys, paper
+// and the beanie's greens, continuously repositioned into the header.
 const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitContext=portraitCanvas.getContext('2d');
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
 const grid=144;
-// Cell classes written by scripts/generate-portrait-pixels.py, in draw order.
+// Cell classes written by scripts/generate-portrait-pixels.py: ink, dark grey,
+// light grey, paper, green, bright green. On the dark page the ink is pure
+// black, so the clothing sinks into the page and the face and beanie stand out.
 const inks={
-  light:[null,'#0a0f0c','#8a958e','#1c6b3a','#2fae62','#ffffff'],
-  dark:[null,'#000000','#7f8f85','#1f7a44','#3ddc84','#eef6f0']
+  light:[null,'#0a0f0c','#5f6963','#a5b0a9','#ffffff','#1c6b3a','#2fae62'],
+  dark:[null,'#000000','#68746d','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
 };
-// On the dark page the black figure is traced in green so it keeps its shape.
-const rimInk='#2a9a57';
-const portraitCells=[[],[],[],[],[],[]],rimCells=[],thumbs={},bursts=[];
+// Each class is kept twice: as single cells, and as row runs for quick drawing.
+const portraitCells=inks.light.map(()=>[]),portraitRuns=inks.light.map(()=>[]),thumbs={},bursts=[];
+const columnX=new Float32Array(grid+1),rowY=new Float32Array(grid+1),rowShift=new Float32Array(grid);
 let portraitReady=false,portraitWidth=0,portraitHeight=0,portraitDpr=1,layoutDirty=true,riseStart=0;
 let position={x:0,y:0,w:0,h:0},pointer={x:-999,y:-999};
 function buildPortrait(image){
   const buffer=document.createElement('canvas');buffer.width=buffer.height=grid;
   const b=buffer.getContext('2d',{willReadFrequently:true});b.drawImage(image,0,0,grid,grid);
   const data=b.getImageData(0,0,grid,grid).data;
-  const kind=(x,y)=>x<0||y<0||x>=grid||y>=grid?-1:data[(y*grid+x)*4+3]>127?Math.round(data[(y*grid+x)*4]/40):0;
-  for(let y=0;y<grid;y++)for(let x=0;x<grid;x++){const cell=kind(x,y);if(!cell||!portraitCells[cell])continue;portraitCells[cell].push(x,y);if(cell===1&&!(kind(x-1,y)&&kind(x+1,y)&&kind(x,y-1)&&kind(x,y+1)))rimCells.push(x,y);}
-  // A plain bitmap per theme serves the small copy that docks in the header.
-  for(const theme of ['light','dark']){
+  for(let y=0;y<grid;y++)for(let x=0,start=0,last=0;x<=grid;x++){
+    const i=(y*grid+x)*4,cell=x<grid&&data[i+3]>127?Math.round(data[i]/40):0;
+    if(cell!==last){if(portraitRuns[last]&&last)portraitRuns[last].push(start,y,x-start);start=x;last=cell;}
+    if(cell&&portraitCells[cell])portraitCells[cell].push(x,y);
+  }
+  // A plain bitmap serves the small copy that docks in the header. It keeps
+  // the light print in both themes and sits on a light disc on the dark page.
+  for(const theme of ['light']){
     const small=document.createElement('canvas');small.width=small.height=grid;const c=small.getContext('2d');
-    const paint=(list,ink)=>{c.fillStyle=ink;for(let i=0;i<list.length;i+=2)c.fillRect(list[i],list[i+1],1,1);};
-    portraitCells.forEach((list,cell)=>{if(inks[theme][cell])paint(list,inks[theme][cell]);});
-    if(theme==='dark')paint(rimCells,rimInk);
+    portraitRuns.forEach((runs,cell)=>{if(!cell)return;c.fillStyle=inks[theme][cell];for(let i=0;i<runs.length;i+=3)c.fillRect(runs[i],runs[i+1],runs[i+2],1);});
     thumbs[theme]=small;
   }
   portraitReady=true;portraitFloat.classList.add('has-canvas');layoutDirty=true;portraitLayout();drawPortrait(performance.now());
 }
 const portraitImage=new Image();
 portraitImage.onload=()=>buildPortrait(portraitImage);portraitImage.onerror=()=>portraitFloat.classList.add('ready');portraitImage.src='assets/portrait-pixels.png';
-function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;position={x:anchor.left+(dock.left-anchor.left)*eased,y:anchor.top+(dock.top-anchor.top)*eased,w:anchor.width+(small-anchor.width)*eased,h:anchor.height+(small-anchor.height)*eased};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.add('ready');const dpr=Math.min(devicePixelRatio||1,2);const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
+function portraitLayout(){const anchor=portraitAnchor.getBoundingClientRect();const hero=$('#home').getBoundingClientRect();const end=Math.max(180,hero.height*.75);let p=Math.max(0,Math.min(1,(scrollY-30)/end));const eased=p*p*(3-2*p);header.classList.toggle('scrolled',scrollY>40);const dock=portraitDock.getBoundingClientRect();const small=innerWidth<=760?32:40;const dpr=Math.min(devicePixelRatio||1,3),fit=v=>Math.round(v*dpr)/dpr;position={x:fit(anchor.left+(dock.left-anchor.left)*eased),y:fit(anchor.top+(dock.top-anchor.top)*eased),w:fit(anchor.width+(small-anchor.width)*eased),h:fit(anchor.height+(small-anchor.height)*eased)};portraitFloat.style.transform=`translate3d(${position.x}px,${position.y}px,0)`;portraitFloat.style.width=`${position.w}px`;portraitFloat.style.height=`${position.h}px`;portraitFloat.classList.toggle('docked',p>.98);portraitFloat.classList.toggle('compact',position.w<75);portraitFloat.classList.add('ready');const targetW=Math.round(position.w*dpr),targetH=Math.round(position.h*dpr);if(portraitCanvas.width!==targetW||portraitCanvas.height!==targetH){portraitCanvas.width=targetW;portraitCanvas.height=targetH;portraitDpr=dpr;portraitContext.setTransform(dpr,0,0,dpr,0,0);}portraitWidth=position.w;portraitHeight=position.h;layoutDirty=false;}
 function drawPortrait(now){
   if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
   const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
   const theme=root.dataset.theme==='dark'?'dark':'light';
-  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],26,4,98,98,0,0,w,h);return;}
-  const t=reduced?0:now/1000,snap=portraitDpr;
-  const scale=Math.min(w/grid,h/grid),size=Math.ceil(scale*snap)/snap+(reduced?0:1/snap);
-  const centre=w/2;
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs.light,27,4,96,96,0,0,w,h);return;}
+  const t=reduced?0:now/1000,snap=portraitDpr,px=v=>Math.round(v*snap)/snap;
+  // Small cells are held to whole device pixels, where that costs little size,
+  // so the dither stays even.
+  let scale=Math.min(w/grid,h/grid);const whole=Math.floor(scale*snap),fine=scale*snap<4.5&&whole>=1&&whole/(scale*snap)>=.85;if(fine)scale=whole/snap;
+  const span=grid*scale,middle=px(w/2);
   // The print rises into place once, then sways: each row drifts a little
   // out of step with its neighbours, as if the page were breathing.
   if(!riseStart&&entered)riseStart=now;
   const rise=reduced?1:riseStart?Math.min(1,(now-riseStart)/1100):0,settle=1-(1-rise)**3;
-  const oy=h-grid*scale+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2);
-  const yaw=reduced?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:scale*.42;
+  const top=px(h-span+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2));
+  const yaw=reduced||fine?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:w*.003;
+  for(let i=0;i<=grid;i++){columnX[i]=middle+(i-grid/2)*scale*yaw;rowY[i]=px(top+i*scale);}
+  for(let i=0;i<grid;i++)rowShift[i]=Math.sin(i*.055+t*1.3)*sway;
   // A tap nudges a small ring of cells outward along rays, then they fall back.
   while(bursts.length&&now-bursts[0].start>620)bursts.shift();
   const reach=Math.max(34,w*.11);
-  const fill=(list,ink)=>{
-    ctx.fillStyle=ink;ctx.beginPath();
-    for(let i=0;i<list.length;i+=2){
-      const cx=list[i],cy=list[i+1];
-      let x=centre+(cx-grid/2)*scale*yaw+Math.sin(cy*.055+t*1.3)*sway,y=oy+cy*scale;
-      if(!reduced){
+  const near=!reduced&&pointer.x>-45&&pointer.y>-45&&pointer.x<w+45&&pointer.y<h+45;
+  for(let cell=1;cell<inks.light.length;cell++){
+    ctx.fillStyle=inks[theme][cell];ctx.beginPath();
+    if(!near&&!bursts.length){
+      // Undisturbed, whole runs of a row are drawn at once and tile exactly.
+      const runs=portraitRuns[cell];
+      for(let i=0;i<runs.length;i+=3){const cx=runs[i],cy=runs[i+1],x=px(columnX[cx]+rowShift[cy]);ctx.rect(x,rowY[cy],px(columnX[cx+runs[i+2]]+rowShift[cy])-x,rowY[cy+1]-rowY[cy]);}
+    }else{
+      const list=portraitCells[cell];
+      for(let i=0;i<list.length;i+=2){
+        const cx=list[i],cy=list[i+1];
+        let x=columnX[cx]+rowShift[cy],y=rowY[cy],moved=false;
+        const wide=px(columnX[cx+1]+rowShift[cy])-px(x),tall=rowY[cy+1]-y;
         const dx=x-pointer.x,dy=y-pointer.y,dist=Math.hypot(dx,dy);
-        if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;}
+        if(dist<45){const force=(1-dist/45)*5;x+=dx/(dist||1)*force;y+=dy/(dist||1)*force;moved=true;}
         for(const burst of bursts){
           const bx=x-burst.x,by=y-burst.y,far=Math.hypot(bx,by);if(far>=reach)continue;
           const age=(now-burst.start)/620,swell=age<.22?1-(1-age/.22)**2:(1-(age-.22)/.78)**2;
           const throwBy=swell*(1-far/reach)**.6*reach*.5*(.3+.7*(((cx*73856093)^(cy*19349663))&255)/255);
-          x+=bx/(far||1)*throwBy;y+=by/(far||1)*throwBy;
+          x+=bx/(far||1)*throwBy;y+=by/(far||1)*throwBy;moved=true;
         }
+        ctx.rect(px(x),moved?px(y):y,wide,tall);
       }
-      ctx.rect(Math.round(x*snap)/snap,Math.round(y*snap)/snap,size,size);
     }
     ctx.fill();
-  };
-  portraitCells.forEach((list,cell)=>{if(inks[theme][cell])fill(list,inks[theme][cell]);});
-  if(theme==='dark')fill(rimCells,rimInk);
+  }
 }
 window.addEventListener('pointerdown',e=>{const x=e.clientX-position.x,y=e.clientY-position.y;if(reduced||position.w<75||x<0||y<0||x>position.w||y>position.h)return;bursts.push({x,y,start:performance.now()});if(bursts.length>4)bursts.shift();},{passive:true});
 window.addEventListener('pointermove',e=>{pointer={x:e.clientX-position.x,y:e.clientY-position.y}},{passive:true});
