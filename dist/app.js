@@ -49,17 +49,17 @@ let lastScrollY=scrollY;
 window.addEventListener('scroll',()=>{if(Math.abs(scrollY-lastScrollY)>1){userPaused=true;scheduleGreeting();enter();}lastScrollY=scrollY;},{passive:true});
 scheduleGreeting();
 
-// The brand avatar redrawn on a small grid: ink, two greys, paper and the
-// beanie's greens, continuously repositioned into the header.
+// The brand avatar as a soft print on a small grid: ink, two greys, paper
+// and the beanie's greens, continuously repositioned into the header.
 const portraitFloat=$('#portrait-float'),portraitCanvas=$('#pixels'),portraitContext=portraitCanvas.getContext('2d');
 const portraitAnchor=$('#portrait-anchor'),portraitDock=$('#portrait-dock'),header=$('#site-header');
-const grid=192;
+const grid=144;
 // Cell classes written by scripts/generate-portrait-pixels.py: ink, dark grey,
 // light grey, paper, green, bright green. On the dark page the ink is lifted
 // to charcoal so the black clothing still reads against a near-black page.
 const inks={
-  light:[null,'#0a0f0c','#56605a','#a5b0a9','#ffffff','#1c6b3a','#2fae62'],
-  dark:[null,'#262f29','#606c65','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
+  light:[null,'#0a0f0c','#5f6963','#a5b0a9','#ffffff','#1c6b3a','#2fae62'],
+  dark:[null,'#262f29','#68746d','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
 };
 // Each class is kept twice: as single cells, and as row runs for quick drawing.
 const portraitCells=inks.light.map(()=>[]),portraitRuns=inks.light.map(()=>[]),thumbs={},bursts=[];
@@ -90,7 +90,7 @@ function drawPortrait(now){
   if(!portraitReady||!pageVisible)return;if(layoutDirty)portraitLayout();
   const ctx=portraitContext,w=portraitWidth,h=portraitHeight;if(!w||!h)return;ctx.clearRect(0,0,w,h);
   const theme=root.dataset.theme==='dark'?'dark':'light';
-  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],36,6,128,128,0,0,w,h);return;}
+  if(w<75){ctx.imageSmoothingQuality='high';ctx.drawImage(thumbs[theme],27,4,96,96,0,0,w,h);return;}
   const t=reduced?0:now/1000,snap=portraitDpr,px=v=>Math.round(v*snap)/snap;
   // Small cells are held to whole device pixels, where that costs little size,
   // so the dither stays even.
@@ -103,7 +103,7 @@ function drawPortrait(now){
   const top=px(h-span+(1-settle)*h*.22+(reduced?0:Math.sin(t*.8)*1.2));
   const yaw=reduced||fine?1:.987+Math.sin(t*.65)*.012,sway=reduced?0:w*.003;
   for(let i=0;i<=grid;i++){columnX[i]=middle+(i-grid/2)*scale*yaw;rowY[i]=px(top+i*scale);}
-  for(let i=0;i<grid;i++)rowShift[i]=Math.sin(i*.041+t*1.3)*sway;
+  for(let i=0;i<grid;i++)rowShift[i]=Math.sin(i*.055+t*1.3)*sway;
   // A tap nudges a small ring of cells outward along rays, then they fall back.
   while(bursts.length&&now-bursts[0].start>620)bursts.shift();
   const reach=Math.max(34,w*.11);
