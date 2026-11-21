@@ -8,7 +8,7 @@ My work sits around AI, Web3, technical writing, research, storytelling and the 
 
 ## Overview
 
-A responsive, single-page portfolio with a white, green and black pixel identity, readable typography and subtle motion. It brings together my writing, research, experiments and builds.
+A responsive, single-page portfolio with a black and white pixel identity, readable typography and subtle motion. It brings together my writing, research, experiments and builds.
 
 ## Features
 
@@ -16,7 +16,7 @@ A responsive, single-page portfolio with a white, green and black pixel identity
 - A welcome greeting that cycles through English, Spanish, French, Chinese, Japanese, German, Turkish and Pidgin. Tap to pause or resume; scrolling pauses it.
 - An About section with a separate personal philosophy card.
 - An animated “My content” card featuring six topics: AI models, Large language models, RWA (Real World Assets), Technical writing, Crypto/blockchain and Open-source software.
-- An archive with image previews, article links and repositories where supplied.
+- An archive of three folders, one per category, with work covers peeking out. Opening a folder brings out a mini folder for each work, linking to the work and to its repository where there is one.
 - A grid of projects I’ve worked with, linking to their X profiles.
 - An audience visualisation based on the supplied three-month impressions snapshot.
 - Direct contact and publication links.
