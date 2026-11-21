@@ -7,7 +7,7 @@ let pageVisible=!document.hidden;
 const themeButton=$('#theme-toggle');
 const themeQuery=matchMedia('(prefers-color-scheme: dark)');
 function savedTheme(){try{const theme=localStorage.getItem('geek-theme');return theme==='dark'||theme==='light'?theme:null}catch{return null}}
-function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#060907':'#ffffff';}
+function updateThemeButton(){const dark=root.dataset.theme==='dark';themeButton.setAttribute('aria-pressed',String(dark));themeButton.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');$('.theme-label').textContent=dark?'Light':'Dark';$('meta[name="theme-color"]').content=dark?'#0a0a0b':'#ffffff';}
 function applyTheme(theme){root.dataset.theme=theme;updateThemeButton();drawPortrait(performance.now());}
 updateThemeButton();
 // The device setting decides the theme until the visitor picks one. Picking
@@ -58,8 +58,8 @@ const grid=144;
 // light grey, paper, green, bright green. On the dark page the ink is pure
 // black, so the clothing sinks into the page and the face and beanie stand out.
 const inks={
-  light:[null,'#0a0f0c','#5f6963','#a5b0a9','#ffffff','#1c6b3a','#2fae62'],
-  dark:[null,'#000000','#68746d','#a9b4ae','#eef6f0','#1f7a44','#3ddc84']
+  light:[null,'#0b0b0c','#636369','#a9a9af','#ffffff','#1c6b3a','#2fae62'],
+  dark:[null,'#000000','#6e6e75','#adadb3','#f1f1f2','#1f7a44','#3ddc84']
 };
 // Each class is kept twice: as single cells, and as row runs for quick drawing.
 const portraitCells=inks.light.map(()=>[]),portraitRuns=inks.light.map(()=>[]),thumbs={},bursts=[];
