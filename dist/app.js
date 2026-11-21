@@ -168,10 +168,17 @@ document.addEventListener('visibilitychange',updateContentMotion);
 reducedQuery.addEventListener('change',()=>{contentCard.classList.remove('pointer-near');updateContentMotion();});
 updateContentMotion();
 
-// Archive categories with keyboard support, no image placeholders.
-const tabs=[...document.querySelectorAll('[role="tab"]')];
-function selectTab(tab,focus=false){tabs.forEach(t=>{const selected=t===tab;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!selected;});if(focus)tab.focus();}
-tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',e=>{let target;if(e.key==='ArrowRight')target=(i+1)%tabs.length;if(e.key==='ArrowLeft')target=(i+tabs.length-1)%tabs.length;if(e.key==='Home')target=0;if(e.key==='End')target=tabs.length-1;if(target!==undefined){e.preventDefault();selectTab(tabs[target],true)}})});
+// Proof of work: each category is a folder. One opens at a time and lays its works out below.
+const folderGrid=$('.folders'),folders=[...document.querySelectorAll('.folder')];
+function setFolder(folder,open){folder.setAttribute('aria-expanded',String(open));document.getElementById(folder.getAttribute('aria-controls')).classList.toggle('is-open',open);}
+folders.forEach(folder=>folder.addEventListener('click',()=>{
+  const opening=folder.getAttribute('aria-expanded')!=='true',before=folder.getBoundingClientRect().top;
+  folders.forEach(other=>setFolder(other,other===folder&&opening));
+  folderGrid.classList.toggle('has-open',opening);
+  // Closing a panel above this folder moves it up; keep it where the visitor tapped.
+  const shift=folder.getBoundingClientRect().top-before;
+  if(Math.abs(shift)>1)scrollTo({top:scrollY+shift,behavior:'instant'});
+}));
 
 // The flower exists only in the closing dialog and starts on visitor activation.
 const bloomDialog=$('#bloom-dialog'),bloomTrigger=$('#bloom-trigger'),flower=$('#flower'),flowerStill=$('#flower-still');
