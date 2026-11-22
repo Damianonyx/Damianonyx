@@ -193,7 +193,8 @@ flower.addEventListener('error',()=>{if(bloomDialog.open){flower.hidden=true;flo
 
 const navigationLinks=[...document.querySelectorAll('.desktop-nav a')];
 new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){navigationLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+e.target.id));}}},{rootMargin:'-15% 0px -60% 0px',threshold:0}).observe($('#about'));
-for(const id of ['archive','projects','audience','contact'])new IntersectionObserver(entries=>{if(entries[0].isIntersecting)navigationLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+id));},{rootMargin:'-15% 0px -60% 0px',threshold:0}).observe(document.getElementById(id));
+// Socials has no link of its own; while it is on screen, Contact is the nearest.
+for(const [id,link] of [['archive','archive'],['projects','projects'],['audience','audience'],['socials','contact'],['contact','contact']])new IntersectionObserver(entries=>{if(entries[0].isIntersecting)navigationLinks.forEach(a=>a.classList.toggle('active',a.hash==='#'+link));},{rootMargin:'-15% 0px -60% 0px',threshold:0}).observe(document.getElementById(id));
 
 reducedQuery.addEventListener('change',e=>{reduced=e.matches;greetingMotionOverride=false;if(reduced&&bloomDialog.open){flower.pause();flower.hidden=true;flowerStill.hidden=false;}scheduleGreeting();drawPortrait(performance.now());});
 document.addEventListener('visibilitychange',()=>{pageVisible=!document.hidden;scheduleGreeting();if(!pageVisible)flower.pause();else if(bloomDialog.open&&!reduced&&!flower.ended)flower.play().catch(()=>{});});

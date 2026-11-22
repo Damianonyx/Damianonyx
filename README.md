@@ -19,7 +19,7 @@ A responsive, single-page portfolio with a black and white pixel identity, reada
 - An archive of three folders, one per category, with work covers peeking out. Opening a folder brings out a mini folder for each work, linking to the work and to its repository where there is one.
 - A grid of projects I’ve worked with, linking to their X profiles.
 - An audience visualisation based on the supplied three-month impressions snapshot.
-- Direct contact and publication links.
+- A Socials section with X, Medium, Substack and GitHub, followed by Get in touch with email and Telegram.
 - A closing “Let’s Bloom” flower animation, revealed on activation.
 - Light and dark themes that follow the device setting until the visitor picks one, then remember that choice.
 - Responsive mobile layouts, keyboard controls, visible focus states and reduced-motion support.

@@ -218,3 +218,10 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline-color:var(
 @media(max-width:760px){.mini-folders{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;padding:2px 0 8px}.mini-folder{aspect-ratio:.95;--tab:52%}.mini-title{font-size:13px}}
 @media(max-width:380px){.mini-folder{aspect-ratio:.8}.mini-folder .folder-front{padding:8px 10px 10px}.mini-type{font-size:9px}.mini-title{font-size:12px;margin-top:6px;-webkit-line-clamp:2}.mini-index{font-size:20px}.mini-folder .folder-action,.mini-repo{width:28px;height:28px;border-radius:9px}.mini-actions{gap:5px}}
 @media(prefers-reduced-motion:reduce){.work-panel.is-open .mini-folder{animation:none}.paper-blank{transition:none}}
+
+/* Socials sit in their own section before Get in touch, which keeps email and Telegram. */
+.socials{border-top:1px solid var(--line)}
+.social-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.touch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:760px){.social-grid{grid-template-columns:1fr 1fr}.socials .section-title{margin-bottom:24px}}
+@media(max-width:380px){.social-grid{grid-template-columns:1fr 1fr;gap:14px 18px}}
