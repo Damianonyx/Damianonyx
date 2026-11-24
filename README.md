@@ -17,9 +17,9 @@ A responsive, single-page portfolio with a black and white pixel identity, reada
 - An About section with a separate personal philosophy card.
 - An animated “My content” card featuring six topics: AI models, Large language models, RWA (Real World Assets), Technical writing, Crypto/blockchain and Open-source software.
 - An archive of three folders, one per category, with work covers peeking out. Opening a folder brings out a mini folder for each work, linking to the work and to its repository where there is one.
-- A grid of projects I’ve worked with, linking to their X profiles.
+- Projects I’ve worked with as a wheel of cards that turns one card at a time; drag it, step it with the buttons or tab through it. Each card links to the project’s X profile. Reduced motion shows a plain grid instead.
 - An audience visualisation based on the supplied three-month impressions snapshot.
-- Direct contact and publication links.
+- A Socials section with X, Medium, Substack and GitHub, followed by Get in touch with email and Telegram.
 - A closing “Let’s Bloom” flower animation, revealed on activation.
 - Light and dark themes that follow the device setting until the visitor picks one, then remember that choice.
 - Responsive mobile layouts, keyboard controls, visible focus states and reduced-motion support.
@@ -74,6 +74,8 @@ npm run check
 | `dist/index.html` | Portfolio content, links and metadata |
 | `dist/style.css` | Responsive layout, themes and visual styles |
 | `dist/app.js` | Greeting, portrait, topic card, archive, audience and flower interactions |
+| `dist/orbit.js` | The projects wheel |
+| `scripts/` | Generators for the portrait, the projects wheel cards and the globe's land mask |
 | `dist/assets/` | Images, fonts, icons and animation assets |
 | `dist/site.webmanifest` | Web app metadata |
 | `package.json` | Dependencies and development commands |
@@ -84,6 +86,7 @@ The `dist/` directory contains the editable website files and is the root served
 ## Updating the Portfolio
 
 - Edit text, project entries, image references and contact links in `dist/index.html`.
+- After adding a project with a new logo, run `python scripts/generate-project-cards.py` to make its wheel card.
 - Add new images to `dist/assets/` and provide meaningful alternative text.
 - Adjust layout and appearance in `dist/style.css`.
 - Adjust animation and interaction behaviour in `dist/app.js`.
