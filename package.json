@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "check": "node --check dist/app.js" },
+  "scripts": { "dev": "vite", "check": "node --check dist/app.js && node --check dist/globe.js && node --check dist/orbit.js" },
   "devDependencies": { "vite": "8.0.13" }
 }
