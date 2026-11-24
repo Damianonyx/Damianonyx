@@ -1,13 +1,13 @@
 // Projects I've worked with, as a wheel of cards standing in a disc. The wheel
 // turns one card at a time and rests; visitors can drag it, step it with the
-// buttons, or tab to a card to bring it to the top. The plain grid stays for
-// reduced motion and for visitors without scripts.
+// buttons, or tab to a card to bring it to the top. The plain grid shows instead
+// for visitors without scripts, and whenever reduced motion is on.
 (() => {
   'use strict';
   const section = document.querySelector('#projects');
   const grid = section && section.querySelector('.project-grid');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  if (!grid || reduce.matches) return;
+  if (!grid) return;
   const projects = [...grid.querySelectorAll('.project')].map(link => {
     const logo = link.querySelector('img').getAttribute('src');
     return { href: link.href, logo, card: logo.replace('assets/', 'assets/cards/'),
@@ -35,8 +35,8 @@
       </div>
     </div>
   </div>`;
+  orbit.hidden = true;
   section.querySelector('.projects-head').after(orbit);
-  section.classList.add('has-orbit');
   const stage = orbit.querySelector('.orbit-stage'), ring = orbit.querySelector('.orbit-ring');
   const disc = orbit.querySelector('.orbit-disc'), hud = orbit.querySelector('.orbit-hud');
   const caption = orbit.querySelector('.orbit-caption'), nameLink = orbit.querySelector('.orbit-name');
@@ -46,7 +46,7 @@
   // centre is below the stage. s is the wheel's position in cards; card e sits
   // p = e - s places from the top, at angle p * spacing.
   let width = 0, cardW = 0, cardH = 0, radius = 0, spacing = 0, centreX = 0, centreY = 0, reach = 0;
-  let items = [], slots = 0, s = 0, tween = null, drag = null, hovered = -1, focused = -1;
+  let active = false, items = [], slots = 0, s = 0, tween = null, drag = null, hovered = -1, focused = -1;
   let shown = -1, visible = false, userPaused = false, suppressClick = false;
   let frame = 0, wake = 0, restUntil = performance.now() + HOLD, drawnAt = NaN, settling = true;
 
@@ -157,11 +157,11 @@
       turnTo(Math.round(s) + 1);
     }
     draw();
-    if (tween || drag || settling) { schedule(); return; }
+    if (tween || settling || (drag && drag.moved)) { schedule(); return; }
     clearTimeout(wake);
-    if (!userPaused && hovered < 0 && focused < 0) wake = setTimeout(schedule, Math.max(16, restUntil - performance.now()));
+    if (!drag && !userPaused && hovered < 0 && focused < 0) wake = setTimeout(schedule, Math.max(16, restUntil - performance.now()));
   }
-  function schedule() { if (!frame && visible && !document.hidden) frame = requestAnimationFrame(tick); }
+  function schedule() { if (active && !frame && visible && !document.hidden) frame = requestAnimationFrame(tick); }
 
   // Stepping, pausing and keyboard focus.
   const step = by => { focused = -1; turnTo(Math.round(tween ? tween.to : s) + by, 900); };
@@ -176,12 +176,15 @@
     restUntil = performance.now() + 600;
     updateMotion(); schedule();
   });
+  // Only keyboard focus steers the wheel; a mouse press also focuses the card it lands on.
+  const fromKeyboard = el => { try { return el.matches(':focus-visible'); } catch { return true; } };
   ring.addEventListener('focusin', event => {
     stage.scrollLeft = stage.scrollTop = 0;   // where overflow: clip is missing, focus can scroll the stage
+    if (!fromKeyboard(event.target)) return;
     const index = items.findIndex(card => card.item.contains(event.target));
     if (index >= 0) { focused = index; schedule(); }
   });
-  ring.addEventListener('focusout', () => { focused = -1; restUntil = performance.now() + HOLD; schedule(); });
+  ring.addEventListener('focusout', () => { if (focused < 0) return; focused = -1; restUntil = performance.now() + HOLD; schedule(); });
 
   // Dragging turns the wheel under the pointer; letting go settles on a card.
   stage.addEventListener('pointerdown', event => {
@@ -192,6 +195,8 @@
   });
   stage.addEventListener('pointermove', event => {
     if (!drag || event.pointerId !== drag.id) return;
+    // The button came up somewhere this page never heard about.
+    if (event.pointerType === 'mouse' && !(event.buttons & 1)) { release(event); return; }
     const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
     if (!drag.moved) {
       if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return;
@@ -215,9 +220,12 @@
       orbit.classList.remove('is-dragging');
     }
     drag = null;
+    schedule();
   }
-  stage.addEventListener('pointerup', release);
-  stage.addEventListener('pointercancel', release);
+  // A press can end anywhere, not only over the wheel.
+  addEventListener('pointerup', release);
+  addEventListener('pointercancel', release);
+  addEventListener('blur', () => { if (drag) release({ pointerId: drag.id }); });
   stage.addEventListener('click', event => {
     if (suppressClick) { event.preventDefault(); event.stopPropagation(); suppressClick = false; }
   }, true);
@@ -231,7 +239,20 @@
     if (visible) { restUntil = Math.max(restUntil, performance.now() + 900); schedule(); }
   }).observe(stage);
   document.addEventListener('visibilitychange', () => { restUntil = performance.now() + HOLD; schedule(); });
-  reduce.addEventListener('change', () => { if (reduce.matches) { userPaused = true; updateMotion(); } });
+  // Reduced motion swaps the wheel for the plain grid, even while the page is open.
+  function setActive(on) {
+    if (on === active) return;
+    active = on;
+    const focusedCard = on ? null : items.find(card => card.item.contains(document.activeElement));
+    orbit.hidden = !on;
+    section.classList.toggle('has-orbit', on);
+    if (on) { layout(true); restUntil = performance.now() + HOLD; schedule(); return; }
+    cancelAnimationFrame(frame); frame = 0; clearTimeout(wake);
+    tween = drag = null; hovered = focused = -1;
+    orbit.classList.remove('is-dragging');
+    if (focusedCard) grid.querySelectorAll('.project')[focusedCard.project].focus({ preventScroll: true });
+  }
+  reduce.addEventListener('change', () => setActive(!reduce.matches));
   updateMotion();
-  layout(true);
+  setActive(!reduce.matches);
 })();
